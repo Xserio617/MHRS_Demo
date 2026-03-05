@@ -1,0 +1,234 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        ROOT_DIR = "."
+        BACKEND_DIR = "backend"
+        FRONTEND_DIR = "frontend"
+        PY_VENV = ".venv-jenkins"
+        API_PORT = "8001"
+        DOCKER_IMAGE_NAME = "mhrs-fastapi-backend"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                echo "Kod checkout tamamlandı."
+            }
+        }
+
+        stage('Start Infrastructure') {
+            steps {
+                dir("${ROOT_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                            docker compose up -d mariadb elasticsearch rabbitmq || docker-compose up -d mariadb elasticsearch rabbitmq
+                            docker compose ps || docker-compose ps
+                            '''
+                        } else {
+                            powershell '''
+                            docker compose up -d mariadb elasticsearch rabbitmq
+                            if ($LASTEXITCODE -ne 0) { docker-compose up -d mariadb elasticsearch rabbitmq }
+                            docker compose ps
+                            if ($LASTEXITCODE -ne 0) { docker-compose ps }
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Setup Backend') {
+            steps {
+                dir("${BACKEND_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                            python3 -m venv ${PY_VENV}
+                            ${PY_VENV}/bin/python -m pip install --upgrade pip
+                            ${PY_VENV}/bin/python -m pip install -r requirements.txt
+                            '''
+                        } else {
+                            powershell '''
+                            py -3 -m venv ${env:PY_VENV}
+                            .\\${env:PY_VENV}\\Scripts\\python.exe -m pip install --upgrade pip
+                            .\\${env:PY_VENV}\\Scripts\\python.exe -m pip install -r requirements.txt
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Run Migrations') {
+            steps {
+                dir("${BACKEND_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '${PY_VENV}/bin/python -m alembic -c ../alembic.ini upgrade head'
+                        } else {
+                            powershell '.\\${env:PY_VENV}\\Scripts\\python.exe -m alembic -c ..\\alembic.ini upgrade head'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Backend Tests') {
+            steps {
+                dir("${BACKEND_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                            mkdir -p test-reports
+                            ${PY_VENV}/bin/python -m pytest tests/ -v --junitxml=test-reports/results.xml
+                            '''
+                        } else {
+                            powershell '''
+                            if (!(Test-Path test-reports)) { New-Item -ItemType Directory -Path test-reports | Out-Null }
+                            .\\${env:PY_VENV}\\Scripts\\python.exe -m pytest tests/ -v --junitxml=test-reports/results.xml
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    junit "${BACKEND_DIR}/test-reports/results.xml"
+                }
+            }
+        }
+
+        stage('Frontend Build') {
+            steps {
+                dir("${FRONTEND_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                            npm ci || npm install
+                            npm run build
+                            '''
+                        } else {
+                            powershell '''
+                            npm ci
+                            if ($LASTEXITCODE -ne 0) { npm install }
+                            npm run build
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('API Smoke Test') {
+            steps {
+                dir("${ROOT_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                            nohup ${BACKEND_DIR}/${PY_VENV}/bin/python -m uvicorn app.main:app --app-dir ${BACKEND_DIR} --host 127.0.0.1 --port ${API_PORT} > uvicorn.log 2>&1 &
+                            echo $! > .uvicorn.pid
+                            for i in $(seq 1 30); do
+                              curl -sf http://127.0.0.1:${API_PORT}/health && break
+                              sleep 2
+                            done
+                            curl -sf http://127.0.0.1:${API_PORT}/health
+                            curl -sf http://127.0.0.1:${API_PORT}/api/v1/auth/users
+                            '''
+                        } else {
+                            powershell '''
+                            $p = Start-Process -FilePath ".\\${env:BACKEND_DIR}\\${env:PY_VENV}\\Scripts\\python.exe" -ArgumentList "-m uvicorn app.main:app --app-dir ${env:BACKEND_DIR} --host 127.0.0.1 --port ${env:API_PORT}" -PassThru
+                            Set-Content -Path ".uvicorn.pid" -Value $p.Id
+
+                            $healthy = $false
+                            for ($i = 0; $i -lt 30; $i++) {
+                                try {
+                                    Invoke-RestMethod -Uri "http://127.0.0.1:${env:API_PORT}/health" -Method Get | Out-Null
+                                    $healthy = $true
+                                    break
+                                } catch {
+                                    Start-Sleep -Seconds 2
+                                }
+                            }
+
+                            if (-not $healthy) { throw "API health endpoint hazır değil" }
+
+                            Invoke-RestMethod -Uri "http://127.0.0.1:${env:API_PORT}/api/v1/auth/users" -Method Get | Out-Null
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${ROOT_DIR}") {
+                        script {
+                            if (isUnix()) {
+                                sh '''
+                                if [ -f .uvicorn.pid ]; then
+                                  kill $(cat .uvicorn.pid) || true
+                                  rm -f .uvicorn.pid
+                                fi
+                                '''
+                            } else {
+                                powershell '''
+                                if (Test-Path .uvicorn.pid) {
+                                  $pid = Get-Content .uvicorn.pid
+                                  Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                                  Remove-Item .uvicorn.pid -Force -ErrorAction SilentlyContinue
+                                }
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Backend Docker Image') {
+            steps {
+                dir("${BACKEND_DIR}") {
+                    script {
+                        if (isUnix()) {
+                            sh "docker build -t ${DOCKER_IMAGE_NAME}:${env.BUILD_ID} ."
+                            sh "docker tag ${DOCKER_IMAGE_NAME}:${env.BUILD_ID} ${DOCKER_IMAGE_NAME}:latest"
+                        } else {
+                            powershell "docker build -t ${DOCKER_IMAGE_NAME}:${env.BUILD_ID} ."
+                            powershell "docker tag ${DOCKER_IMAGE_NAME}:${env.BUILD_ID} ${DOCKER_IMAGE_NAME}:latest"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir("${ROOT_DIR}") {
+                script {
+                    if (isUnix()) {
+                        sh 'docker compose down || docker-compose down || true'
+                    } else {
+                        powershell '''
+                        docker compose down
+                        if ($LASTEXITCODE -ne 0) { docker-compose down }
+                        '''
+                    }
+                }
+            }
+        }
+        success {
+            echo "✅ Jenkins tam otomasyon başarıyla tamamlandı."
+        }
+        failure {
+            echo "❌ Pipeline başarısız oldu. Logları kontrol edin."
+        }
+    }
+}

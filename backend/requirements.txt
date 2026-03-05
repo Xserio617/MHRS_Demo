@@ -1,0 +1,31 @@
+# --- Core Framework & Server ---
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+
+# --- Data Validation & Settings (Pydantic v2) ---
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+email-validator>=2.0.0
+
+# --- Security & Auth ---
+PyJWT>=2.8.0
+passlib[bcrypt]>=1.7.4
+bcrypt<4.1
+
+# --- Database (MariaDB) ---
+SQLAlchemy>=2.0.0
+pymysql>=1.1.0
+alembic>=1.11.0
+
+# --- Search (Elasticsearch) ---
+elasticsearch>=8.11.0,<9.0.0
+
+# --- Message Broker (RabbitMQ) ---
+# FastAPI asenkron çalıştığı için pika yerine aio-pika kullanmak performansı artırır
+aio-pika>=9.0.0
+
+# --- Testing (Jenkins CI/CD süreci için) ---
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0

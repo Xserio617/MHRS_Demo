@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 1. Ana Veritabanı: MariaDB
+  mariadb:
+    image: mariadb:10.11
+    container_name: mhrs_mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: mhrs_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 2. Arama Motoru: Elasticsearch (Tek düğümlü, yerel geliştirme ayarlarıyla)
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    container_name: mhrs_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Yerel test için güvenlik katmanını kapatıyoruz
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m" # RAM kullanımını sınırlandırıyoruz
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  # 3. Mesaj Kuyruğu: RabbitMQ (Yönetim paneli dahil)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: mhrs_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # Uygulamanın haberleşeceği port
+      - "15672:15672" # Tarayıcıdan girebileceğin yönetim paneli portu
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  mariadb_data:
+  es_data:
+  rabbitmq_data:
