@@ -283,6 +283,37 @@ curl.exe -s http://127.0.0.1:9200/_cluster/health
 
 ---
 
+## Guncel Notlar (2026-03)
+
+Bu bolumdeki maddeler, mevcut icerigi degistirmeden son eklenen ozelliklerin ozetidir.
+
+### Frontend
+- Ust sag alanda sabit kullanici adi kaldirildi; oturum yoksa `Giris` / `Kayit Ol`, oturum varsa hesap ve cikis gorunur.
+- Yeni auth sayfasi eklendi: `/auth` (`?tab=login` veya `?tab=register`).
+- Doktor panelinde hos geldiniz metni e-posta yerine doktorun ad-soyadini gosterir.
+- Ana sayfadaki randevu paneli artik gercek veriyle calisir:
+  - `Randevularim`: `active` durumundaki randevular
+  - `Gecmis Randevularim`: `active` disindaki durumlar (`cancelled`, `completed` vb.)
+
+### Backend API
+- Yeni endpoint: `GET /appointments/me/search`
+  - Hastanin randevularini Elasticsearch uzerinden listeler.
+- Yeni endpoint: `GET /doctors/me`
+  - Giris yapan doktorun profil bilgisini doner.
+
+### Elasticsearch
+- Doktor indeksine ek olarak randevu indeksi kullanilir: `appointments_index`.
+- Uygulama acilisinda randevu dokumanlari ES'e senkronlanir.
+- Randevu olusturma ve iptal islemlerinde ES dokumani guncellenir.
+
+### Production Hazirlik
+- Backend CORS origin listesi ortam degiskeni ile yonetilir:
+  - `BACKEND_CORS_ORIGINS=https://mhrs.example.com,https://www.mhrs.example.com`
+- Frontend API adresi ortam degiskeni ile yonetilir:
+  - `NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1`
+
+---
+
 ## Sık Karşılaşılan Sorunlar
 
 1. **`Method Not Allowed` / endpoint uyuşmazlığı**
