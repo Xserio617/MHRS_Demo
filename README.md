@@ -135,6 +135,22 @@ npm install
 npm run dev -- -H 127.0.0.1 -p 5173
 ```
 
+### 4.1) Sunucuya bağlama hazırlığı (Prod)
+
+Backend tarafında CORS origin listesi artık ortam değişkeninden yönetilir:
+
+```bash
+BACKEND_CORS_ORIGINS=https://mhrs.example.com,https://www.mhrs.example.com
+```
+
+Frontend tarafında API base URL'i ortam değişkeninden verilir:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1
+```
+
+Not: Lokal geliştirmede mevcut varsayılanlar (`127.0.0.1`) çalışmaya devam eder.
+
 ### 5) (Opsiyonel) RabbitMQ consumer başlat
 
 ```bash

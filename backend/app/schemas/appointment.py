@@ -35,3 +35,14 @@ class AppointmentResponse(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentSearchItem(BaseModel):
+    appointment_uid: uuid.UUID
+    patient_id: int
+    doctor_id: int
+    doctor_full_name: str
+    hospital_name: str
+    clinic_name: str
+    appointment_date: datetime
+    status: str

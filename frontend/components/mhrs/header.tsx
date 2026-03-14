@@ -1,10 +1,74 @@
 "use client"
 
+import { useEffect, useState } from 'react'
 import { Search, Settings, ChevronDown, User } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+
+type SessionState = {
+  authenticated: boolean
+  role: string
+  email: string
+  doctorName: string
+}
 
 export function MHRSHeader() {
+  const router = useRouter()
+  const [session, setSession] = useState<SessionState>({
+    authenticated: false,
+    role: '',
+    email: '',
+    doctorName: '',
+  })
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('mhrs_access_token')
+    const role = localStorage.getItem('mhrs_role') ?? ''
+    const email = localStorage.getItem('mhrs_email') ?? ''
+    const doctorName = localStorage.getItem('mhrs_doctor_name') ?? ''
+
+    setSession({
+      authenticated: Boolean(accessToken),
+      role,
+      email,
+      doctorName,
+    })
+  }, [])
+
+  function getAccountLabel() {
+    if (session.role === 'doctor' && session.doctorName) {
+      return session.doctorName.toUpperCase()
+    }
+    if (session.email) {
+      return session.email.toUpperCase()
+    }
+    return 'HESABIM'
+  }
+
+  function getAccountHref() {
+    if (session.role === 'doctor') return '/doctor'
+    if (session.role === 'admin') return '/admin/panel'
+    return '/'
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('mhrs_access_token')
+    localStorage.removeItem('mhrs_refresh_token')
+    localStorage.removeItem('mhrs_role')
+    localStorage.removeItem('mhrs_email')
+    localStorage.removeItem('mhrs_doctor_name')
+
+    setSession({
+      authenticated: false,
+      role: '',
+      email: '',
+      doctorName: '',
+    })
+    router.push('/')
+    router.refresh()
+  }
+
   return (
     <header className="flex items-center justify-between bg-card border-b border-border px-4 py-2">
       <div className="flex items-center gap-3">
@@ -44,11 +108,40 @@ export function MHRSHeader() {
           <span>Turkce</span>
           <ChevronDown className="size-3" />
         </button>
-        <button className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
-          <User className="size-4" />
-          <span>CEM CEDIMOGLU</span>
-          <ChevronDown className="size-3" />
-        </button>
+
+        {session.authenticated ? (
+          <>
+            <Link
+              href={getAccountHref()}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <User className="size-4" />
+              <span>{getAccountLabel()}</span>
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              Cikis
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Link
+              href="/auth?tab=login"
+              className="px-3 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              Giris
+            </Link>
+            <Link
+              href="/auth?tab=register"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <User className="size-4" />
+              <span>Kayit Ol</span>
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   )

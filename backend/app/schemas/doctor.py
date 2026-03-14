@@ -74,3 +74,12 @@ class DoctorAdminItem(BaseModel):
     doctor_type: DoctorType
     shift_start: str
     shift_end: str
+
+
+class DoctorMeResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    title: str
+
+    model_config = ConfigDict(from_attributes=True)

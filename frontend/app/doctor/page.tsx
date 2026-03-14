@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getDoctorAppointments, type AppointmentItem } from '@/lib/mhrs-api'
+import { getDoctorAppointments, getMyDoctorProfile, type AppointmentItem } from '@/lib/mhrs-api'
 
 function toDate(value: string): Date {
   return new Date(value)
@@ -30,7 +30,7 @@ function mapStatusLabel(status: string): string {
 
 export default function DoctorPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [doctorName, setDoctorName] = useState('')
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorText, setErrorText] = useState('')
@@ -46,8 +46,13 @@ export default function DoctorPage() {
     setLoading(true)
     setErrorText('')
     try {
-      const response = await getDoctorAppointments(accessToken)
+      const [response, profile] = await Promise.all([
+        getDoctorAppointments(accessToken),
+        getMyDoctorProfile(accessToken),
+      ])
       setAppointments(response)
+      setDoctorName(`${profile.first_name} ${profile.last_name}`.trim())
+      localStorage.setItem('mhrs_doctor_name', `${profile.first_name} ${profile.last_name}`.trim())
     } catch (error) {
       setErrorText((error as Error).message)
     } finally {
@@ -62,7 +67,7 @@ export default function DoctorPage() {
       return
     }
 
-    setEmail(localStorage.getItem('mhrs_email') ?? '')
+    setDoctorName(localStorage.getItem('mhrs_doctor_name') ?? '')
     setAuthorized(true)
     void loadDoctorAppointments()
   }, [router])
@@ -72,6 +77,7 @@ export default function DoctorPage() {
     localStorage.removeItem('mhrs_refresh_token')
     localStorage.removeItem('mhrs_role')
     localStorage.removeItem('mhrs_email')
+    localStorage.removeItem('mhrs_doctor_name')
     router.push('/admin')
   }
 
@@ -103,7 +109,7 @@ export default function DoctorPage() {
         <section className="border border-border rounded-xl bg-card p-5 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Doktor Paneli</h1>
-            <p className="text-sm text-muted-foreground mt-2">Hoş geldiniz {email || 'Doktor'}</p>
+            <p className="text-sm text-muted-foreground mt-2">Hoş geldiniz {doctorName || 'Doktor'}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => void loadDoctorAppointments()} disabled={loading}>

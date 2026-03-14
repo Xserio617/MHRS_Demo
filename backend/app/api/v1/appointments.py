@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.dependencies import get_current_user, get_current_doctor
 from app.models.user import User
-from app.schemas.appointment import AppointmentCreate, AppointmentResponse
+from app.schemas.appointment import AppointmentCreate, AppointmentResponse, AppointmentSearchItem
 from app.services import appointment_service
 from app.tasks.rabbitmq import publish_message
 
@@ -80,6 +80,14 @@ def get_my_appointments(
     # Sadece current_user.id'ye ait randevuları getirecek bir SELECT sorgusudur.
     appointments = appointment_service.get_patient_appointments(db, patient_id=current_user.id)
     return appointments
+
+
+@router.get("/me/search", response_model=List[AppointmentSearchItem])
+def get_my_appointments_from_search(current_user: CurrentUser):
+    try:
+        return appointment_service.get_patient_appointments_from_es(patient_id=current_user.id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Elasticsearch servisi kullanılamıyor: {exc}")
 
 
 @router.get("/doctor/me", response_model=List[AppointmentResponse])

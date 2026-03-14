@@ -178,3 +178,10 @@ def delete_doctor(db: Session, doctor_id: int) -> None:
         remove_doctor_document(doctor_id)
     except Exception as exc:
         print(f"[ES] Doktor indeks silme atlandı: {exc}")
+
+
+def get_my_doctor_profile(db: Session, user: User) -> Doctor:
+    doctor = db.execute(select(Doctor).where(Doctor.user_id == user.id)).scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doktor profili bulunamadı.")
+    return doctor

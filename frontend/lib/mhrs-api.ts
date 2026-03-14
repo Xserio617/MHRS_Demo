@@ -85,7 +85,7 @@ export type RegisterResponse = {
   preferred_hospital_id: number | null
 }
 
-export type UserListItem = {
+export type AuthUser = {
   uid: string
   email: string
   is_active: boolean
@@ -94,6 +94,15 @@ export type UserListItem = {
   wants_doctor_role: boolean
   doctor_application_status: string
   preferred_hospital_id: number | null
+}
+
+export type UserListItem = AuthUser
+
+export type DoctorMeProfile = {
+  id: number
+  first_name: string
+  last_name: string
+  title: string
 }
 
 export type CreateDoctorPayload = {
@@ -140,6 +149,17 @@ export type AppointmentCreatePayload = {
 export type AppointmentItem = {
   uid: string
   doctor_id: number
+  appointment_date: string
+  status: string
+}
+
+export type AppointmentSearchItem = {
+  appointment_uid: string
+  patient_id: number
+  doctor_id: number
+  doctor_full_name: string
+  hospital_name: string
+  clinic_name: string
   appointment_date: string
   status: string
 }
@@ -229,6 +249,17 @@ export async function getDoctorAppointments(accessToken: string): Promise<Appoin
   })
 }
 
+export async function getMyAppointmentsFromSearch(
+  accessToken: string
+): Promise<AppointmentSearchItem[]> {
+  return request<AppointmentSearchItem[]>('/appointments/me/search', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+}
+
 export async function getDoctorBusySlots(params: {
   doctorId: number
   date: string
@@ -244,8 +275,17 @@ export async function listUsers(): Promise<UserListItem[]> {
   return request<UserListItem[]>('/auth/users')
 }
 
-export async function getMe(accessToken: string): Promise<UserListItem> {
-  return request<UserListItem>('/auth/me', {
+export async function getMe(accessToken: string): Promise<AuthUser> {
+  return request<AuthUser>('/auth/me', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+}
+
+export async function getMyDoctorProfile(accessToken: string): Promise<DoctorMeProfile> {
+  return request<DoctorMeProfile>('/doctors/me', {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${accessToken}`,

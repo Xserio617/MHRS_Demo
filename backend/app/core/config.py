@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Elasticsearch ve RabbitMQ
     ELASTICSEARCH_URL: str = "http://localhost:9200"
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672//"
+    BACKEND_CORS_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173"
+
+    @computed_field
+    def CORS_ORIGINS(self) -> list[str]:
+        return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",") if origin.strip()]
 
     @model_validator(mode="after")
     def validate_security_settings(self):

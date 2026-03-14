@@ -5,6 +5,11 @@ from fastapi import HTTPException, status
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.doctor import Doctor
 from app.schemas.appointment import AppointmentCreate
+from app.search.es_client import (
+    build_appointment_document,
+    index_appointment_document,
+    search_patient_appointments_in_es,
+)
 
 def create_appointment(db: Session, patient_id: int, appointment_in: AppointmentCreate) -> Appointment:
     stmt_doc = select(Doctor).where(Doctor.id == appointment_in.doctor_id)
@@ -52,6 +57,12 @@ def create_appointment(db: Session, patient_id: int, appointment_in: Appointment
     db.add(new_appointment)
     db.commit()
     db.refresh(new_appointment)
+
+    try:
+        document = build_appointment_document(new_appointment)
+        index_appointment_document(document)
+    except Exception as exc:
+        print(f"[ES] Randevu indeksleme atlandı: {exc}")
     
     return new_appointment
 
@@ -81,6 +92,13 @@ def cancel_appointment(db: Session, appointment: Appointment) -> Appointment:
     db.add(appointment)
     db.commit()
     db.refresh(appointment)
+
+    try:
+        document = build_appointment_document(appointment)
+        index_appointment_document(document)
+    except Exception as exc:
+        print(f"[ES] Randevu güncelleme atlandı: {exc}")
+
     return appointment
 
 
@@ -98,3 +116,7 @@ def get_doctor_busy_times_for_date(db: Session, doctor_id: int, target_date: dat
     )
     appointment_dates = db.execute(stmt).scalars().all()
     return sorted({appointment_date.strftime("%H:%M") for appointment_date in appointment_dates})
+
+
+def get_patient_appointments_from_es(patient_id: int) -> list[dict]:
+    return search_patient_appointments_in_es(patient_id=patient_id)

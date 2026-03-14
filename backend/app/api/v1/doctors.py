@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_doctor
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.doctor import DoctorAdminItem, DoctorCreate, DoctorResponse, DoctorUpdate
+from app.schemas.doctor import DoctorAdminItem, DoctorCreate, DoctorMeResponse, DoctorResponse, DoctorUpdate
 from app.services import doctor_services
 
 router = APIRouter()
@@ -30,6 +30,14 @@ def update_doctor(doctor_id: int, doctor_in: DoctorUpdate, db: Session = Depends
 def delete_doctor(doctor_id: int, db: Session = Depends(get_db)):
     doctor_services.delete_doctor(db, doctor_id=doctor_id)
     return None
+
+
+@router.get("/me", response_model=DoctorMeResponse)
+def get_my_doctor_profile(
+    db: Session = Depends(get_db),
+    current_doctor: User = Depends(get_current_doctor),
+):
+    return doctor_services.get_my_doctor_profile(db, user=current_doctor)
 
 
 @router.get("/{doctor_id}/schedule")

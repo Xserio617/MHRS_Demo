@@ -4,7 +4,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.search.es_client import create_doctor_index
+from app.search.es_client import create_appointment_index, create_doctor_index, sync_all_appointments_to_es
+from app.core.database import SessionLocal
 
 # Rotalarımızı (Router) içeri aktarıyoruz
 from app.api.v1 import auth, appointments, hospitals, doctors, search
@@ -13,6 +14,13 @@ from app.api.v1 import auth, appointments, hospitals, doctors, search
 async def lifespan(_: FastAPI):
     try:
         create_doctor_index()
+        create_appointment_index()
+
+        db = SessionLocal()
+        try:
+            sync_all_appointments_to_es(db)
+        finally:
+            db.close()
     except Exception as exc:
         print(f"[Startup] Elasticsearch index hazırlığı atlandı: {exc}")
     yield
@@ -23,10 +31,7 @@ app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
