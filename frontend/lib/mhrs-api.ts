@@ -78,6 +78,7 @@ export type RegisterResponse = {
   uid: string
   email: string
   is_active: boolean
+  is_email_verified: boolean
   is_doctor: boolean
   is_admin: boolean
   wants_doctor_role: boolean
@@ -89,11 +90,19 @@ export type AuthUser = {
   uid: string
   email: string
   is_active: boolean
+  is_email_verified: boolean
   is_doctor: boolean
   is_admin: boolean
   wants_doctor_role: boolean
   doctor_application_status: string
   preferred_hospital_id: number | null
+}
+
+export async function verifyEmail(token: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  })
 }
 
 export type UserListItem = AuthUser

@@ -25,6 +25,9 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     
     is_active: Mapped[bool] = mapped_column(default=True)
+    is_email_verified: Mapped[bool] = mapped_column(default=False)
+    email_verification_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_doctor: Mapped[bool] = mapped_column(default=False)
     wants_doctor_role: Mapped[bool] = mapped_column(default=False)
     doctor_application_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)

@@ -11,8 +11,10 @@ from app.api.dependencies import get_current_user
 from app.models.user import User
 from app.core.security import create_access_token, create_refresh_token
 from app.schemas.user import UserCreate, UserResponse, UserListItem
+from app.schemas.user import EmailVerificationRequest, EmailVerificationConfirm, MessageResponse
 from app.schemas.token import Token, RefreshTokenRequest
 from app.services import auth_services as auth_service
+from app.services.email_service import send_email_verification_email
 
 router = APIRouter()
 
@@ -32,6 +34,12 @@ def register(user_in: UserCreate, db: DbSession):
     
     # 2. Kayıt yoksa yeni kullanıcıyı oluştur
     new_user = auth_service.create_user(db, user_in=user_in)
+    verification_token = auth_service.create_email_verification_token(db, user=new_user)
+    try:
+        send_email_verification_email(to_email=new_user.email, token=verification_token)
+    except RuntimeError:
+        # Kayıt işlemini bozmayıp kullanıcıya sonradan doğrulama e-postası isteyebilme imkanı bırakırız.
+        pass
     
     # 3. Pydantic şemamız (UserResponse) sayesinde şifre gizlenerek sadece izin verilen veriler (UID vb.) dönecek
     return new_user
@@ -60,6 +68,12 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbSess
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-posta veya şifre hatalı",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if settings.EMAIL_VERIFICATION_REQUIRED and not user.is_email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Giriş için e-posta doğrulaması gereklidir.",
         )
     
     # 3. Giriş başarılıysa JWT Access Token üret
@@ -107,3 +121,34 @@ def refresh_access_token(payload: RefreshTokenRequest, db: DbSession):
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
     }
+
+
+@router.post("/verify-email/request", response_model=MessageResponse)
+def request_email_verification(payload: EmailVerificationRequest, db: DbSession):
+    user = auth_service.get_user_by_email(db, email=payload.email)
+
+    # User enumeration riskini azaltmak için her durumda aynı mesajı döndürüyoruz.
+    generic_message = "Eğer hesap mevcutsa doğrulama e-postası gönderildi."
+
+    if not user or user.is_email_verified:
+        return {"message": generic_message}
+
+    verification_token = auth_service.create_email_verification_token(db, user=user)
+    try:
+        send_email_verification_email(to_email=user.email, token=verification_token)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    return {"message": generic_message}
+
+
+@router.post("/verify-email", response_model=MessageResponse)
+def verify_email(payload: EmailVerificationConfirm, db: DbSession):
+    user = auth_service.get_user_by_verification_token(db, token=payload.token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Doğrulama bağlantısı geçersiz veya süresi dolmuş.",
+        )
+
+    auth_service.mark_email_as_verified(db, user=user)
+    return {"message": "E-posta adresi başarıyla doğrulandı."}

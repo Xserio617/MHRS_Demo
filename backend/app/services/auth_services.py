@@ -1,9 +1,12 @@
-from datetime import datetime, timezone
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models.user import User
 from app.schemas.user import UserCreate
 from app.core.security import get_password_hash, verify_password
+from app.core.config import settings
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     """
@@ -28,6 +31,7 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     db_user = User(
         email=user_in.email,
         hashed_password=hashed_password,
+        is_email_verified=False,
         wants_doctor_role=wants_doctor_application,
         doctor_application_status="pending" if wants_doctor_application else "none",
         preferred_hospital_id=user_in.preferred_hospital_id,
@@ -42,6 +46,43 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     db.refresh(db_user)
     
     return db_user
+
+
+def _hash_verification_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_email_verification_token(db: Session, user: User) -> str:
+    token = secrets.token_urlsafe(32)
+    user.email_verification_token_hash = _hash_verification_token(token)
+    user.email_verification_expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return token
+
+
+def get_user_by_verification_token(db: Session, token: str) -> User | None:
+    token_hash = _hash_verification_token(token)
+    now = datetime.now(timezone.utc)
+    stmt = select(User).where(
+        User.email_verification_token_hash == token_hash,
+        User.email_verification_expires_at.is_not(None),
+        User.email_verification_expires_at >= now,
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def mark_email_as_verified(db: Session, user: User) -> User:
+    user.is_email_verified = True
+    user.email_verification_token_hash = None
+    user.email_verification_expires_at = None
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 def authenticate_user(db: Session, email: str, password: str) -> User | None:
     """

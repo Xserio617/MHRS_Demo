@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getMe, getMyDoctorProfile, login, register } from '@/lib/mhrs-api'
+import { getMe, getMyDoctorProfile, login, register, verifyEmail } from '@/lib/mhrs-api'
 import { Button } from '@/components/ui/button'
 
 type Mode = 'login' | 'register'
@@ -20,6 +20,7 @@ export default function AuthPage() {
     const tab = searchParams.get('tab')
     return tab === 'register' ? 'register' : 'login'
   }, [searchParams])
+  const verifyToken = searchParams.get('verify_token')
 
   const [mode, setMode] = useState<Mode>(initialMode)
   const [email, setEmail] = useState('')
@@ -30,6 +31,41 @@ export default function AuthPage() {
   useEffect(() => {
     setMode(initialMode)
   }, [initialMode])
+
+  useEffect(() => {
+    if (!verifyToken) {
+      return
+    }
+
+    let cancelled = false
+
+    async function runVerification() {
+      setLoading(true)
+      setFeedback(null)
+      try {
+        const result = await verifyEmail(verifyToken)
+        if (!cancelled) {
+          setFeedback({ type: 'success', text: result.message })
+          setMode('login')
+          router.replace('/auth?tab=login')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFeedback({ type: 'error', text: (error as Error).message })
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    runVerification()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router, verifyToken])
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

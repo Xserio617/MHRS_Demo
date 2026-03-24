@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    EMAIL_VERIFICATION_EXPIRE_MINUTES: int = 15
+    EMAIL_VERIFICATION_REQUIRED: bool = True
 
     # MariaDB Ayarları
     MARIADB_USER: str = "root"
@@ -27,6 +29,12 @@ class Settings(BaseSettings):
     ELASTICSEARCH_URL: str = "http://localhost:9200"
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672//"
     BACKEND_CORS_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173"
+    FRONTEND_BASE_URL: str = "http://127.0.0.1:5173"
+
+    # Brevo (SMTP/API yerine HTTP API ile gönderim)
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
+    BREVO_SENDER_NAME: str = "MHRS"
 
     @computed_field
     def CORS_ORIGINS(self) -> list[str]:

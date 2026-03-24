@@ -27,6 +27,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     uid: uuid.UUID
     is_active: bool
+    is_email_verified: bool
     is_doctor: bool
     is_admin: bool
     wants_doctor_role: bool
@@ -42,6 +43,7 @@ class UserResponse(UserBase):
 class UserListItem(UserBase):
     uid: uuid.UUID
     is_active: bool
+    is_email_verified: bool
     is_doctor: bool
     is_admin: bool
     wants_doctor_role: bool
@@ -49,3 +51,15 @@ class UserListItem(UserBase):
     preferred_hospital_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EmailVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailVerificationConfirm(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+
+
+class MessageResponse(BaseModel):
+    message: str
